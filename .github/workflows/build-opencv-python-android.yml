@@ -73,7 +73,7 @@ jobs:
           CIBW_ARCHS_ANDROID: arm64_v8a x86_64
           CIBW_BUILD: cp314-android_arm64_v8a cp314-android_x86_64
           CIBW_TEST_SKIP: "*"
-          CIBW_BUILD_FRONTEND: pip
+          CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_BUILD: "python -m pip install -U pip setuptools wheel numpy"
           CIBW_BUILD_VERBOSITY: "1"
           CMAKE_ARGS: "-DBUILD_ANDROID_PROJECTS=OFF -DBUILD_ANDROID_EXAMPLES=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF"
