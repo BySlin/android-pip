@@ -66,6 +66,47 @@ jobs:
           path: external/opencv-python
           submodules: recursive
 
+      - name: patch-setup-py
+        working-directory: external/opencv-python
+        run: |
+          # 修复 _classify_installed_files_override 函数中的路径问题
+          # 该函数期望在 cmake-install/python/cv2/ 目录下找到 config-3.py
+          # 但在某些构建配置中，该目录可能不存在或文件未被正确复制
+          cat > patch_setup.py << 'EOF'
+          import re
+          import sys
+
+          def patch_setup():
+              with open('setup.py', 'r') as f:
+                  content = f.read()
+              
+              # 查找 _classify_installed_files_override 函数并添加目录创建逻辑
+              # 在打开 config_py 文件之前确保目录存在
+              old_pattern = r"(with open\(config_py, 'w'\) as opencv_init_config:)"
+              new_code = r"""import os
+              os.makedirs(os.path.dirname(config_py), exist_ok=True)
+              \1"""
+              
+              content = re.sub(old_pattern, new_code, content)
+              
+              # 另外，确保在文件复制之前 python/cv2 目录结构正确
+              # 查找文件复制逻辑并添加前置检查
+              old_copy = r"(shutil\.copyfile\(cmake_install_file, dest_file\))"
+              new_copy = r"""import os
+              os.makedirs(os.path.dirname(dest_file), exist_ok=True)
+              \1"""
+              
+              content = re.sub(old_copy, new_copy, content)
+              
+              with open('setup.py', 'w') as f:
+                  f.write(content)
+              print("Patched setup.py successfully")
+
+          if __name__ == "__main__":
+              patch_setup()
+          EOF
+          python patch_setup.py
+
       - name: build-wheel
         working-directory: external/opencv-python
         env:
@@ -75,8 +116,23 @@ jobs:
           CIBW_TEST_SKIP: "*"
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_BUILD: "python -m pip install -U pip setuptools wheel numpy"
-          CIBW_BUILD_VERBOSITY: "1"
-          CMAKE_ARGS: "-DBUILD_ANDROID_PROJECTS=OFF -DBUILD_ANDROID_EXAMPLES=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DENABLE_PYLINT=OFF -DOPENCV_SKIP_PYTHON_LOADER=OFF -DOPENCV_PYTHON3_INSTALL_PATH=python -DPYTHON3_PACKAGES_PATH=python"
+          CIBW_BUILD_VERBOSITY: "3"
+          # 关键修复：调整 CMake 参数以确保 Python 绑定正确安装
+          # 1. 移除 OPENCV_SKIP_PYTHON_LOADER=OFF，使用默认行为
+          # 2. 使用相对路径确保安装路径正确
+          # 3. 启用 INSTALL_CREATE_DISTRIB 以确保文件结构正确
+          CMAKE_ARGS: >-
+            -DBUILD_ANDROID_PROJECTS=OFF 
+            -DBUILD_ANDROID_EXAMPLES=OFF 
+            -DBUILD_EXAMPLES=OFF 
+            -DBUILD_TESTS=OFF 
+            -DBUILD_PERF_TESTS=OFF 
+            -DENABLE_PYLINT=OFF 
+            -DINSTALL_CREATE_DISTRIB=ON 
+            -DBUILD_opencv_python3=ON 
+            -DBUILD_SHARED_LIBS=OFF 
+            -DCMAKE_BUILD_TYPE=Release
+            -DOPENCV_FORCE_PYTHON_LIBS=ON
         run: python -m cibuildwheel --output-dir wheelhouse . --platform android
 
       - name: upload-artifact
