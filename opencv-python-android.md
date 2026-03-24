@@ -15,11 +15,25 @@
 - Actions Artifact：`opencv-python-android-cp314-arm64-x86_64`
 - GitHub Release：`opencv-python-android-cp314`
 
+## numpy Android 自动构建
+
+在 GitHub 仓库的 Actions 页面运行 `build-numpy-python-android` 工作流。
+
+可选输入参数：
+
+- `numpy_ref`：`numpy/numpy` 的 tag 或分支，默认 `latest`，会自动解析到最新 release tag。
+
+构建产物：
+
+- Actions Artifact：`numpy-android-cp314-arm64-x86_64`
+- GitHub Release：`numpy-android-cp314`
+
 ## 在 Chaquopy 中使用
 
-先从 Release 拿到 wheel 的直接下载地址，再在 `engine/build.gradle.kts` 的 `pip` 中改成 URL 安装：
+先从 Release 拿到 wheel 的直接下载地址，再在 `engine/build.gradle.kts` 的 `pip` 中改成 URL 安装。建议先安装 numpy，再安装 opencv-python：
 
 ```kotlin
+install("numpy @ https://github.com/<你的GitHub用户名>/android-pip/releases/download/numpy-android-cp314/<wheel文件名>.whl")
 install("opencv-python @ https://github.com/<你的GitHub用户名>/android-pip/releases/download/opencv-python-android-cp314/<wheel文件名>.whl")
 ```
 
