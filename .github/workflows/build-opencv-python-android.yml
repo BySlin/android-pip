@@ -66,48 +66,12 @@ jobs:
           path: external/opencv-python
           submodules: recursive
 
-      - name: patch-setup-py
+      - name: fix-setup-py
         working-directory: external/opencv-python
         run: |
-          # 修复 _classify_installed_files_override 函数中的目录创建问题
-          # 在写入 config-3.py 之前确保 python/cv2 目录存在
-          python3 << 'EOF'
-          import re
-
-          with open('setup.py', 'r') as f:
-              content = f.read()
-
-          # 找到写入 config-3.py 的代码块，在前面添加目录创建
-          old_code = '''        # add lines from the old __init__.py file to the config file
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts', '__init__.py'), 'r') as custom_init:
-            custom_init_data = custom_init.read()
-            with open('%spython/cv2/config-%s.py'
-                % (cmake_install_dir, sys.version_info[0]), 'w') as opencv_init_config:
-                opencv_init_config.write(custom_init_data)'''
-
-          new_code = '''        # add lines from the old __init__.py file to the config file
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts', '__init__.py'), 'r') as custom_init:
-            custom_init_data = custom_init.read()
-            # 确保目标目录存在
-            config_dir = os.path.join(cmake_install_dir, 'python', 'cv2')
-            os.makedirs(config_dir, exist_ok=True)
-            with open('%spython/cv2/config-%s.py'
-                % (cmake_install_dir, sys.version_info[0]), 'w') as opencv_init_config:
-                opencv_init_config.write(custom_init_data)'''
-
-          if old_code in content:
-              content = content.replace(old_code, new_code)
-              with open('setup.py', 'w') as f:
-                  f.write(content)
-              print("Successfully patched setup.py")
-          else:
-              print("Warning: Could not find exact code block to patch, trying alternative approach...")
-              # 备选方案：在函数开始处添加目录创建
-              alt_old = '''    def _classify_installed_files_override('''
-              alt_new = '''    def _classify_installed_files_override('''
-              # 这种情况下不修改，让构建失败以便调试
-              raise Exception("Could not patch setup.py - manual intervention needed")
-          EOF
+          # 在 setup.py 中导入 os 模块的地方后面添加 makedirs 调用
+          # 找到写入 config 文件的位置，在前面加上目录创建
+          sed -i 's/with open.*python\/cv2\/config-%s.py.*as opencv_init_config:/import os; os.makedirs(os.path.join(cmake_install_dir, "python", "cv2"), exist_ok=True)\n            &/' setup.py
 
       - name: build-wheel
         working-directory: external/opencv-python
@@ -119,7 +83,6 @@ jobs:
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_BUILD: "python -m pip install -U pip setuptools wheel numpy"
           CIBW_BUILD_VERBOSITY: "3"
-          # 关键：使用正确的 CMake 参数确保 Python 绑定正确安装
           CMAKE_ARGS: >-
             -DBUILD_ANDROID_PROJECTS=OFF 
             -DBUILD_ANDROID_EXAMPLES=OFF 
@@ -131,8 +94,6 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF 
             -DCMAKE_BUILD_TYPE=Release
             -DINSTALL_CREATE_DISTRIB=ON
-            -DPYTHON3_LIMITED_API=ON
-            -DBUILD_OPENEXR=ON
         run: python -m cibuildwheel --output-dir wheelhouse . --platform android
 
       - name: upload-artifact
