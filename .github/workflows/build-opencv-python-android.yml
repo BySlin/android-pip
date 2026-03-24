@@ -66,6 +66,34 @@ jobs:
           path: external/opencv-python
           submodules: recursive
 
+      - name: patch-opencv-setup
+        working-directory: external/opencv-python
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          setup_file = Path("setup.py")
+          content = setup_file.read_text(encoding="utf-8")
+          marker = "def _classify_installed_files_override"
+          if marker not in content:
+              raise RuntimeError("setup.py 中未找到 _classify_installed_files_override")
+          patch_block = (
+              "    config_dir = os.path.join(cmake_install_dir, 'python', 'cv2')\n"
+              "    config_major = os.path.join(config_dir, 'config-{}.py'.format(sys.version_info[0]))\n"
+              "    config_major_minor = os.path.join(config_dir, 'config-{}.{}.py'.format(sys.version_info[0], sys.version_info[1]))\n"
+              "    if (not os.path.exists(config_major)) and os.path.exists(config_major_minor):\n"
+              "        with open(config_major_minor, 'r', encoding='utf-8') as src:\n"
+              "            config_content = src.read()\n"
+              "        with open(config_major, 'w', encoding='utf-8') as dst:\n"
+              "            dst.write(config_content)\n"
+          )
+          if "config_major_minor = os.path.join(config_dir, 'config-{}.{}.py'.format(sys.version_info[0], sys.version_info[1]))" not in content:
+              index = content.index(marker)
+              line_end = content.index("\n", index) + 1
+              content = content[:line_end] + patch_block + content[line_end:]
+              setup_file.write_text(content, encoding="utf-8")
+          PY
+
       - name: build-wheel
         working-directory: external/opencv-python
         env:
@@ -75,9 +103,8 @@ jobs:
           CIBW_TEST_SKIP: "*"
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_BUILD: "python -m pip install -U pip setuptools wheel numpy"
-          CIBW_ENVIRONMENT_ANDROID: "PIP_FIND_LINKS=${{ github.workspace }}/prebuilt-numpy PIP_PREFER_BINARY=1 OPENCV_PYTHON_SKIP_PYTHON_LOADER=1"
           CIBW_BUILD_VERBOSITY: "1"
-          CMAKE_ARGS: "-DBUILD_ANDROID_PROJECTS=OFF -DBUILD_ANDROID_EXAMPLES=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DOPENCV_SKIP_PYTHON_LOADER=ON -DOPENCV_PYTHON_INSTALL_PATH=python -DPYTHON3_PACKAGES_PATH=python"
+          CMAKE_ARGS: "-DBUILD_ANDROID_PROJECTS=OFF -DBUILD_ANDROID_EXAMPLES=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DOPENCV_SKIP_PYTHON_LOADER=OFF -DOPENCV_PYTHON_INSTALL_PATH=python -DPYTHON3_PACKAGES_PATH=python"
         run: python -m cibuildwheel --output-dir wheelhouse . --platform android
 
       - name: upload-artifact
