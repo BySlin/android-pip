@@ -69,43 +69,45 @@ jobs:
       - name: patch-setup-py
         working-directory: external/opencv-python
         run: |
-          # 修复 _classify_installed_files_override 函数中的路径问题
-          # 该函数期望在 cmake-install/python/cv2/ 目录下找到 config-3.py
-          # 但在某些构建配置中，该目录可能不存在或文件未被正确复制
-          cat > patch_setup.py << 'EOF'
+          # 修复 _classify_installed_files_override 函数中的目录创建问题
+          # 在写入 config-3.py 之前确保 python/cv2 目录存在
+          python3 << 'EOF'
           import re
-          import sys
 
-          def patch_setup():
-              with open('setup.py', 'r') as f:
-                  content = f.read()
-              
-              # 查找 _classify_installed_files_override 函数并添加目录创建逻辑
-              # 在打开 config_py 文件之前确保目录存在
-              old_pattern = r"(with open\(config_py, 'w'\) as opencv_init_config:)"
-              new_code = r"""import os
-              os.makedirs(os.path.dirname(config_py), exist_ok=True)
-              \1"""
-              
-              content = re.sub(old_pattern, new_code, content)
-              
-              # 另外，确保在文件复制之前 python/cv2 目录结构正确
-              # 查找文件复制逻辑并添加前置检查
-              old_copy = r"(shutil\.copyfile\(cmake_install_file, dest_file\))"
-              new_copy = r"""import os
-              os.makedirs(os.path.dirname(dest_file), exist_ok=True)
-              \1"""
-              
-              content = re.sub(old_copy, new_copy, content)
-              
+          with open('setup.py', 'r') as f:
+              content = f.read()
+
+          # 找到写入 config-3.py 的代码块，在前面添加目录创建
+          old_code = '''        # add lines from the old __init__.py file to the config file
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts', '__init__.py'), 'r') as custom_init:
+            custom_init_data = custom_init.read()
+            with open('%spython/cv2/config-%s.py'
+                % (cmake_install_dir, sys.version_info[0]), 'w') as opencv_init_config:
+                opencv_init_config.write(custom_init_data)'''
+
+          new_code = '''        # add lines from the old __init__.py file to the config file
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts', '__init__.py'), 'r') as custom_init:
+            custom_init_data = custom_init.read()
+            # 确保目标目录存在
+            config_dir = os.path.join(cmake_install_dir, 'python', 'cv2')
+            os.makedirs(config_dir, exist_ok=True)
+            with open('%spython/cv2/config-%s.py'
+                % (cmake_install_dir, sys.version_info[0]), 'w') as opencv_init_config:
+                opencv_init_config.write(custom_init_data)'''
+
+          if old_code in content:
+              content = content.replace(old_code, new_code)
               with open('setup.py', 'w') as f:
                   f.write(content)
-              print("Patched setup.py successfully")
-
-          if __name__ == "__main__":
-              patch_setup()
+              print("Successfully patched setup.py")
+          else:
+              print("Warning: Could not find exact code block to patch, trying alternative approach...")
+              # 备选方案：在函数开始处添加目录创建
+              alt_old = '''    def _classify_installed_files_override('''
+              alt_new = '''    def _classify_installed_files_override('''
+              # 这种情况下不修改，让构建失败以便调试
+              raise Exception("Could not patch setup.py - manual intervention needed")
           EOF
-          python patch_setup.py
 
       - name: build-wheel
         working-directory: external/opencv-python
@@ -117,10 +119,7 @@ jobs:
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_BUILD: "python -m pip install -U pip setuptools wheel numpy"
           CIBW_BUILD_VERBOSITY: "3"
-          # 关键修复：调整 CMake 参数以确保 Python 绑定正确安装
-          # 1. 移除 OPENCV_SKIP_PYTHON_LOADER=OFF，使用默认行为
-          # 2. 使用相对路径确保安装路径正确
-          # 3. 启用 INSTALL_CREATE_DISTRIB 以确保文件结构正确
+          # 关键：使用正确的 CMake 参数确保 Python 绑定正确安装
           CMAKE_ARGS: >-
             -DBUILD_ANDROID_PROJECTS=OFF 
             -DBUILD_ANDROID_EXAMPLES=OFF 
@@ -128,11 +127,12 @@ jobs:
             -DBUILD_TESTS=OFF 
             -DBUILD_PERF_TESTS=OFF 
             -DENABLE_PYLINT=OFF 
-            -DINSTALL_CREATE_DISTRIB=ON 
             -DBUILD_opencv_python3=ON 
             -DBUILD_SHARED_LIBS=OFF 
             -DCMAKE_BUILD_TYPE=Release
-            -DOPENCV_FORCE_PYTHON_LIBS=ON
+            -DINSTALL_CREATE_DISTRIB=ON
+            -DPYTHON3_LIMITED_API=ON
+            -DBUILD_OPENEXR=ON
         run: python -m cibuildwheel --output-dir wheelhouse . --platform android
 
       - name: upload-artifact
