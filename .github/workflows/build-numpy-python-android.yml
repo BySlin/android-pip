@@ -14,14 +14,16 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -57,7 +59,7 @@ jobs:
           PY
 
       - name: checkout-numpy
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: numpy/numpy
           ref: ${{ steps.resolve_ref.outputs.ref }}
@@ -70,7 +72,6 @@ jobs:
           CIBW_ARCHS_ANDROID: arm64_v8a x86_64
           CIBW_BUILD: cp314-android_arm64_v8a cp314-android_x86_64
           CIBW_TEST_SKIP: "*"
-          CIBW_BUILD_FRONTEND: pip
           CIBW_BUILD_VERBOSITY: "1"
         run: python -m cibuildwheel --output-dir wheelhouse . --platform android
 
