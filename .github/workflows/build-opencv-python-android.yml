@@ -113,6 +113,8 @@ jobs:
               "                          raise Exception(\"Not found: '%s'\" % relpath_re)",
               "                          if relpath_re.startswith(\"share/opencv4/\"):\n                              continue\n                          raise Exception(\"Not found: '%s'\" % relpath_re)",
           )
+          if "relpath_re.startswith(\"share/opencv4/\")" not in s:
+              raise RuntimeError("failed to patch share/opencv4 not-found rule")
           p.write_text(s, encoding="utf-8")
           p2 = Path("opencv/modules/python/CMakeLists.txt")
           s2 = p2.read_text(encoding="utf-8")
