@@ -237,18 +237,7 @@ jobs:
             pkg="$(find /tmp/opencv-loader-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
             [ -n "$pkg" ] || { echo "unpack failed: $whl" >&2; exit 2; }
             init_py="$pkg/cv2/__init__.py"
-            python3 - <<'PY' "$init_py"
-            import sys
-            from pathlib import Path
-            p = Path(sys.argv[1])
-            s = p.read_text(encoding="utf-8")
-            needle = 'native_module = importlib.import_module("cv2")'
-            repl = 'native_module = importlib.import_module("cv2.cv2")'
-            if needle not in s:
-                raise SystemExit(f"loader import target not found: {p}")
-            p.write_text(s.replace(needle, repl, 1), encoding="utf-8")
-            print(f"patched loader: {p}")
-            PY
+            python3 -c 'import sys; from pathlib import Path; p=Path(sys.argv[1]); s=p.read_text(encoding="utf-8"); needle="native_module = importlib.import_module(\"cv2\")"; repl="native_module = importlib.import_module(\"cv2.cv2\")"; (_ for _ in ()).throw(SystemExit(f"loader import target not found: {p}")) if needle not in s else None; p.write_text(s.replace(needle, repl, 1), encoding="utf-8"); print(f"patched loader: {p}")' "$init_py"
             python3 -m wheel pack "$pkg" -d /tmp/opencv-loader-repack
           done
           rm -f wheelhouse/*.whl
