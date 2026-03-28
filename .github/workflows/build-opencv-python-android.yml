@@ -109,11 +109,13 @@ jobs:
               "\"-DPYTHON3_LIBRARY=%s\" % python_lib_path,",
               "\"-DPYTHON3_LIBRARY=%s\" % python_lib_path,\n                \"-DPython3_LIBRARY=%s\" % python_lib_path,\n                \"-DPython3_LIBRARIES=%s\" % python_lib_path,",
           )
-          s = s.replace(
-              "                          raise Exception(\"Not found: '%s'\" % relpath_re)",
-              "                          if relpath_re.startswith(\"share/opencv4/\"):\n                              continue\n                          raise Exception(\"Not found: '%s'\" % relpath_re)",
+          s, n1 = re.subn(
+              r"(?m)^(\\s*)raise Exception\\(\"Not found: .%s.\" % relpath_re\\)\\s*$",
+              r'\\1if relpath_re.startswith("share/opencv4/"):\n\\1    continue\n\\1raise Exception("Not found: \'%s\'" % relpath_re)',
+              s,
+              count=1,
           )
-          if "relpath_re.startswith(\"share/opencv4/\")" not in s:
+          if n1 == 0:
               raise RuntimeError("failed to patch share/opencv4 not-found rule")
           p.write_text(s, encoding="utf-8")
           p2 = Path("opencv/modules/python/CMakeLists.txt")
