@@ -98,7 +98,7 @@ jobs:
           if old in s and "os.makedirs(os.path.dirname(config_py), exist_ok=True)" not in s:
               s = s.replace(old, new, 1)
               p.write_text(s, encoding="utf-8")
-          print(\"patched setup.py for cv2 config dir creation\") 
+          print("patched setup.py for cv2 config dir creation")
           PY
 
       - name: print-toolchain-versions
