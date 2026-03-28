@@ -223,6 +223,37 @@ jobs:
               print(f"valid wheel: {wheel} size={os.path.getsize(wheel)}")
           PY
 
+      - name: patch-wheel-cv2-loader
+        working-directory: external/opencv-python
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade wheel
+          rm -rf /tmp/opencv-loader-unpack /tmp/opencv-loader-repack
+          mkdir -p /tmp/opencv-loader-unpack /tmp/opencv-loader-repack
+          shopt -s nullglob
+          for whl in wheelhouse/*.whl; do
+            rm -rf /tmp/opencv-loader-unpack/*
+            python3 -m wheel unpack "$whl" -d /tmp/opencv-loader-unpack
+            pkg="$(find /tmp/opencv-loader-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+            [ -n "$pkg" ] || { echo "unpack failed: $whl" >&2; exit 2; }
+            init_py="$pkg/cv2/__init__.py"
+            python3 - <<'PY' "$init_py"
+            import sys
+            from pathlib import Path
+            p = Path(sys.argv[1])
+            s = p.read_text(encoding="utf-8")
+            needle = 'native_module = importlib.import_module("cv2")'
+            repl = 'native_module = importlib.import_module("cv2.cv2")'
+            if needle not in s:
+                raise SystemExit(f"loader import target not found: {p}")
+            p.write_text(s.replace(needle, repl, 1), encoding="utf-8")
+            print(f"patched loader: {p}")
+            PY
+            python3 -m wheel pack "$pkg" -d /tmp/opencv-loader-repack
+          done
+          rm -f wheelhouse/*.whl
+          cp -f /tmp/opencv-loader-repack/*.whl wheelhouse/
+
       - name: patch-wheel-libpython-needed
         working-directory: external/opencv-python
         run: |
