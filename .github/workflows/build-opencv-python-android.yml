@@ -250,16 +250,28 @@ jobs:
                 s,
                 count=1,
             )
-            s, _ = re.subn(
-                r'load_first_config\(\[\s*[\'"]config\.py[\'"]\s*\],\s*True\s*\)',
-                "load_first_config(['config.py'], False)",
-                s,
-                count=1,
-            )
             p.write_text(s, encoding="utf-8")
             print(f"patched loader: {p} import_patch={n1}")
             PY
             python3 /tmp/patch_cv2_loader.py "$init_py"
+            python3 - <<'PY' "$pkg/cv2"
+            import sys
+            from pathlib import Path
+
+            cv2_dir = Path(sys.argv[1])
+            config_py = cv2_dir / "config.py"
+            if not config_py.exists():
+                source = None
+                for candidate in ("config-3.14.py", "config-3.py"):
+                    candidate_path = cv2_dir / candidate
+                    if candidate_path.exists():
+                        source = candidate_path.read_text(encoding="utf-8")
+                        break
+                if source is None:
+                    source = "PYTHON_EXTENSIONS_PATHS = []\nBINARIES_PATHS = []\n"
+                config_py.write_text(source, encoding="utf-8")
+                print(f"created missing config.py: {config_py}")
+            PY
             python3 -m wheel pack "$pkg" -d /tmp/opencv-loader-repack
           done
           rm -f wheelhouse/*.whl
@@ -311,6 +323,11 @@ jobs:
               with tempfile.TemporaryDirectory() as td:
                   with zipfile.ZipFile(wheel) as zf:
                       zf.extractall(td)
+                  names = set()
+                  for root, _, files in os.walk(td):
+                      for f in files:
+                          rel = os.path.relpath(os.path.join(root, f), td).replace(os.sep, "/")
+                          names.add(rel)
                   target = None
                   for root, _, files in os.walk(td):
                       for f in files:
@@ -321,6 +338,8 @@ jobs:
                           break
                   if not target:
                       raise SystemExit(f"cv2 native .so not found in {wheel}")
+                  if "cv2/config.py" not in names:
+                      raise SystemExit(f"missing cv2/config.py in {wheel}")
                   out = subprocess.check_output(["objdump", "-p", target], text=True)
                   if "libpython3.14.so" not in out:
                       raise SystemExit(f"missing libpython3.14.so in {wheel}")
