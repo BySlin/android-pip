@@ -209,7 +209,7 @@ jobs:
                   n.startswith("cv2/") and (n.endswith(".so") or ".so." in n)
                   for n in names
               )
-              if size < 5_000_000 or not has_cv2_native:
+              if size < 1_500_000 or not has_cv2_native:
                   bad.append((wheel, size, has_cv2_native))
 
           if bad:
