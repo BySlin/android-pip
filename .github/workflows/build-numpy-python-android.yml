@@ -98,6 +98,21 @@ jobs:
           fi
           test -f external/numpy/vendored-meson/meson/meson.py
 
+      - name: patch-numpy-android-longdouble
+        working-directory: external/numpy
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("numpy/_core/meson.build")
+          s = p.read_text(encoding="utf-8")
+          old = "longdouble_format = meson.get_external_property('longdouble_format', 'UNKNOWN')"
+          new = "longdouble_format = meson.get_external_property('longdouble_format', 'UNKNOWN')\\nif host_machine.system() == 'android' and longdouble_format == 'UNKNOWN'\\n  longdouble_format = 'IEEE_QUAD_LE'\\nendif"
+          if old in s and "host_machine.system() == 'android'" not in s:
+              s = s.replace(old, new, 1)
+              p.write_text(s, encoding="utf-8")
+          print("patched longdouble detection for android cross build")
+          PY
+
       - name: print-toolchain-versions
         run: |
           python --version
@@ -155,6 +170,7 @@ jobs:
           endian = 'little'
           [properties]
           needs_exe_wrapper = true
+          longdouble_format = 'IEEE_QUAD_LE'
           EOF
           SH
           chmod +x tools/wheels/cibw_prepare_android_cross.sh
