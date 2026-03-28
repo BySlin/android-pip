@@ -114,6 +114,10 @@ jobs:
           s2 = p2.read_text(encoding="utf-8")
           s2, n2 = re.subn(r"if\(\s*ANDROID\s+OR\s+APPLE_FRAMEWORK\s+OR\s+WINRT\s*\)", "if(APPLE_FRAMEWORK OR WINRT)", s2, count=1)
           p2.write_text(s2, encoding="utf-8")
+          p4 = Path("opencv/modules/python/python3/CMakeLists.txt")
+          s4 = p4.read_text(encoding="utf-8")
+          s4, n5 = re.subn(r"if\(NOT PYTHON3_INCLUDE_PATH OR NOT PYTHON3_NUMPY_INCLUDE_DIRS\)\n\s*ocv_module_disable\(python3\)\nendif\(\)\n\n", "", s4, count=1)
+          p4.write_text(s4, encoding="utf-8")
           p3 = Path("opencv/cmake/OpenCVDetectPython.cmake")
           s3 = p3.read_text(encoding="utf-8")
           s3, n3 = re.subn(r"if\(NOT\s+ANDROID\s+AND\s+NOT\s+APPLE_FRAMEWORK\)", "if(NOT APPLE_FRAMEWORK)", s3, count=1)
@@ -122,8 +126,8 @@ jobs:
           if marker not in s3:
               s3 += "\n\nif(ANDROID)\n  if(PYTHON3_LIBRARY AND NOT PYTHON3_LIBRARIES)\n    set(PYTHON3_LIBRARIES \"${PYTHON3_LIBRARY}\")\n  endif()\n  if(PYTHON3_LIBRARIES)\n    set(PYTHON3LIBS_FOUND TRUE)\n  endif()\n  if(Python3_NumPy_INCLUDE_DIRS AND NOT PYTHON3_NUMPY_INCLUDE_DIRS)\n    set(PYTHON3_NUMPY_INCLUDE_DIRS \"${Python3_NumPy_INCLUDE_DIRS}\")\n  endif()\nendif()  # android-python3-force\n"
           p3.write_text(s3, encoding="utf-8")
-          if n2 == 0 or n3 == 0 or n4 == 0:
-              raise RuntimeError(f"android python patch not applied fully: n2={n2}, n3={n3}, n4={n4}")
+          if n2 == 0 or n3 == 0 or n4 == 0 or n5 == 0:
+              raise RuntimeError(f"android python patch not applied fully: n2={n2}, n3={n3}, n4={n4}, n5={n5}")
           print("patched setup.py for android python3 detection")
           PY
 
