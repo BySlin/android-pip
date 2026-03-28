@@ -89,7 +89,17 @@ jobs:
       - name: fix-setup-py
         working-directory: external/opencv-python
         run: |
-          sed -i 's/with open.*python\/cv2\/config-%s.py.*as opencv_init_config:/import os; os.makedirs(os.path.join(cmake_install_dir, "python", "cv2"), exist_ok=True)\n            &/' setup.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("setup.py")
+          s = p.read_text(encoding="utf-8")
+          old = "        with open(config_py, 'w') as opencv_init_config:"
+          new = "        os.makedirs(os.path.dirname(config_py), exist_ok=True)\n        with open(config_py, 'w') as opencv_init_config:"
+          if old in s and "os.makedirs(os.path.dirname(config_py), exist_ok=True)" not in s:
+              s = s.replace(old, new, 1)
+              p.write_text(s, encoding="utf-8")
+          print(\"patched setup.py for cv2 config dir creation\") 
+          PY
 
       - name: print-toolchain-versions
         run: |
