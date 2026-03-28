@@ -244,15 +244,13 @@ jobs:
           mkdir -p /tmp/numpy-wheel-unpack /tmp/numpy-wheel-repack
           shopt -s nullglob
           for whl in wheelhouse/*.whl; do
+            rm -rf /tmp/numpy-wheel-unpack/*
             python3 -m wheel unpack "$whl" -d /tmp/numpy-wheel-unpack
-          done
-          for pkg in /tmp/numpy-wheel-unpack/*; do
-            [ -d "$pkg" ] || continue
+            pkg="$(find /tmp/numpy-wheel-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+            [ -n "$pkg" ] || { echo "unpack failed: $whl" >&2; exit 2; }
             while IFS= read -r -d '' so; do
-              if objdump -T "$so" | grep -q " PyExc_ValueError"; then
-                if ! objdump -p "$so" | grep -q "NEEDED .*libpython3.14.so"; then
-                  patchelf --add-needed libpython3.14.so "$so"
-                fi
+              if ! objdump -p "$so" | grep -q "NEEDED .*libpython3.14.so"; then
+                patchelf --add-needed libpython3.14.so "$so"
               fi
             done < <(find "$pkg" -type f -name "*.so" -print0)
             python3 -m wheel pack "$pkg" -d /tmp/numpy-wheel-repack
