@@ -97,6 +97,10 @@ jobs:
           new = "        os.makedirs(os.path.dirname(config_py), exist_ok=True)\n        with open(config_py, 'w') as opencv_init_config:"
           if old in s and "os.makedirs(os.path.dirname(config_py), exist_ok=True)" not in s:
               s = s.replace(old, new, 1)
+          old2 = "                      if not found and \"gapi\" not in relpath_re:"
+          new2 = "                      if not found and \"gapi\" not in relpath_re and \"python/cv2/python-3.\" not in relpath_re:"
+          if old2 in s and "\"python/cv2/python-3.\" not in relpath_re" not in s:
+              s = s.replace(old2, new2, 1)
               p.write_text(s, encoding="utf-8")
           print("patched setup.py for cv2 config dir creation")
           PY
