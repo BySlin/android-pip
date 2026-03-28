@@ -109,6 +109,12 @@ jobs:
               "\"-DPYTHON3_LIBRARY=%s\" % python_lib_path,",
               "\"-DPYTHON3_LIBRARY=%s\" % python_lib_path,\n                \"-DPython3_LIBRARY=%s\" % python_lib_path,\n                \"-DPython3_LIBRARIES=%s\" % python_lib_path,",
           )
+          s, _ = re.subn(
+              r"(?m)^(\s*)raise Exception\\(\"Not found: '%s'\" % relpath_re\\)$",
+              r'\1if relpath_re.startswith("share/opencv4/"):\n\1    continue\n\1raise Exception("Not found: \'%s\'" % relpath_re)',
+              s,
+              count=1,
+          )
           p.write_text(s, encoding="utf-8")
           p2 = Path("opencv/modules/python/CMakeLists.txt")
           s2 = p2.read_text(encoding="utf-8")
