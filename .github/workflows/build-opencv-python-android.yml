@@ -118,6 +118,9 @@ jobs:
           s3 = p3.read_text(encoding="utf-8")
           s3 = s3.replace("if(NOT ANDROID AND NOT APPLE_FRAMEWORK)", "if(NOT APPLE_FRAMEWORK)")
           s3 = s3.replace("if(NOT ANDROID AND NOT IOS AND NOT XROS)", "if(NOT IOS AND NOT XROS)")
+          marker = "# android-python3-force"
+          if marker not in s3:
+              s3 += "\n\nif(ANDROID)\n  if(PYTHON3_LIBRARY AND NOT PYTHON3_LIBRARIES)\n    set(PYTHON3_LIBRARIES \"${PYTHON3_LIBRARY}\")\n  endif()\n  if(PYTHON3_LIBRARIES)\n    set(PYTHON3LIBS_FOUND TRUE)\n  endif()\n  if(Python3_NumPy_INCLUDE_DIRS AND NOT PYTHON3_NUMPY_INCLUDE_DIRS)\n    set(PYTHON3_NUMPY_INCLUDE_DIRS \"${Python3_NumPy_INCLUDE_DIRS}\")\n  endif()\nendif()  # android-python3-force\n"
           p3.write_text(s3, encoding="utf-8")
           print("patched setup.py for android python3 detection")
           PY
