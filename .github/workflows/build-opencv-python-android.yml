@@ -100,8 +100,17 @@ jobs:
               s,
               count=1,
           )
+          s = s.replace("-DPYTHON3_LIMITED_API=ON", "-DPYTHON3_LIMITED_API=OFF")
+          s = s.replace(
+              "\"-DPYTHON3_INCLUDE_DIR=%s\" % python_include_dir,",
+              "\"-DPYTHON3_INCLUDE_DIR=%s\" % python_include_dir,\n                \"-DPython3_INCLUDE_DIR=%s\" % python_include_dir,",
+          )
+          s = s.replace(
+              "\"-DPYTHON3_LIBRARY=%s\" % python_lib_path,",
+              "\"-DPYTHON3_LIBRARY=%s\" % python_lib_path,\n                \"-DPython3_LIBRARY=%s\" % python_lib_path,\n                \"-DPython3_LIBRARIES=%s\" % python_lib_path,",
+          )
           p.write_text(s, encoding="utf-8")
-          print("patched setup.py for config directory creation")
+          print("patched setup.py for android python3 detection")
           PY
 
       - name: print-toolchain-versions
