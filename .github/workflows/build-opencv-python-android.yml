@@ -250,7 +250,7 @@ jobs:
                 s,
                 count=1,
             )
-            if n1 == 0:
+            if n1 == 0 and 'importlib.import_module("cv2.cv2")' not in s:
                 raise SystemExit(f"loader import target not found: {p}")
             s, _ = re.subn(
                 r'load_first_config\(\[\s*[\'"]config\.py[\'"]\s*\],\s*True\s*\)',
