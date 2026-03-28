@@ -114,6 +114,11 @@ jobs:
           s2 = p2.read_text(encoding="utf-8")
           s2 = s2.replace("if(ANDROID OR APPLE_FRAMEWORK OR WINRT)", "if(APPLE_FRAMEWORK OR WINRT)")
           p2.write_text(s2, encoding="utf-8")
+          p3 = Path("opencv/cmake/OpenCVDetectPython.cmake")
+          s3 = p3.read_text(encoding="utf-8")
+          s3 = s3.replace("if(NOT ANDROID AND NOT APPLE_FRAMEWORK)", "if(NOT APPLE_FRAMEWORK)")
+          s3 = s3.replace("if(NOT ANDROID AND NOT IOS AND NOT XROS)", "if(NOT IOS AND NOT XROS)")
+          p3.write_text(s3, encoding="utf-8")
           print("patched setup.py for android python3 detection")
           PY
 
