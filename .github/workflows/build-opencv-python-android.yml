@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      ANDROID_NDK_VERSION: "26.3.11579264"
+      ANDROID_CMAKE_VERSION: "3.22.1"
     steps:
       - uses: actions/checkout@v5
 
@@ -33,7 +35,21 @@ jobs:
       - name: install-tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "cibuildwheel==3.4.0"
+          python -m pip install "cibuildwheel==3.4.0" "ninja==1.11.1.4"
+
+      - name: install-android-toolchains
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;${ANDROID_NDK_VERSION}" \
+            "cmake;${ANDROID_CMAKE_VERSION}"
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+          echo "ANDROID_NDK_ROOT=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+          echo "${ANDROID_SDK_ROOT}/cmake/${ANDROID_CMAKE_VERSION}/bin" >> "${GITHUB_PATH}"
+          echo "${ANDROID_SDK_ROOT}/platform-tools" >> "${GITHUB_PATH}"
 
       - name: resolve-opencv-python-ref
         id: resolve_ref
@@ -43,19 +59,23 @@ jobs:
           python - <<'PY'
           import json
           import os
+          import sys
           import urllib.request
 
           input_ref = (os.environ.get("INPUT_REF") or "").strip()
           if input_ref and input_ref.lower() != "latest":
               ref = input_ref
           else:
-              with urllib.request.urlopen("https://api.github.com/repos/opencv/opencv-python/releases/latest", timeout=30) as response:
-                  data = json.load(response)
-              ref = data["tag_name"]
+              try:
+                  with urllib.request.urlopen("https://api.github.com/repos/opencv/opencv-python/releases/latest", timeout=30) as response:
+                      data = json.load(response)
+                  ref = data["tag_name"]
+              except Exception:
+                  ref = "4.x"
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write(f"ref={ref}\n")
-          print(ref)
+          print(f"resolved opencv-python ref: {ref}", file=sys.stderr)
           PY
 
       - name: checkout-opencv-python
@@ -69,9 +89,15 @@ jobs:
       - name: fix-setup-py
         working-directory: external/opencv-python
         run: |
-          # 在 setup.py 中导入 os 模块的地方后面添加 makedirs 调用
-          # 找到写入 config 文件的位置，在前面加上目录创建
           sed -i 's/with open.*python\/cv2\/config-%s.py.*as opencv_init_config:/import os; os.makedirs(os.path.join(cmake_install_dir, "python", "cv2"), exist_ok=True)\n            &/' setup.py
+
+      - name: print-toolchain-versions
+        run: |
+          python --version
+          java -version
+          cmake --version
+          ninja --version
+          "${ANDROID_NDK_HOME}/ndk-build" --version
 
       - name: build-wheel
         working-directory: external/opencv-python
@@ -83,6 +109,7 @@ jobs:
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_BUILD: "python -m pip install -U pip setuptools wheel numpy"
           CIBW_BUILD_VERBOSITY: "3"
+          CIBW_BUILD_VERBOSITY_ANDROID: "3"
           CMAKE_ARGS: >-
             -DBUILD_ANDROID_PROJECTS=OFF 
             -DBUILD_ANDROID_EXAMPLES=OFF 
@@ -94,7 +121,15 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF 
             -DCMAKE_BUILD_TYPE=Release
             -DINSTALL_CREATE_DISTRIB=ON
-        run: python -m cibuildwheel --output-dir wheelhouse . --platform android
+        run: |
+          set -e
+          python -m cibuildwheel --output-dir wheelhouse . --platform android || {
+            find /tmp -type f \( -name "meson-log.txt" -o -name "*.log" \) | head -n 50 | while read -r file; do
+              echo "===== ${file} ====="
+              tail -n 200 "${file}" || true
+            done
+            exit 1
+          }
 
       - name: upload-artifact
         uses: actions/upload-artifact@v4

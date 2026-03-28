@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      ANDROID_NDK_VERSION: "26.3.11579264"
+      ANDROID_CMAKE_VERSION: "3.22.1"
     steps:
       - uses: actions/checkout@v5
 
@@ -33,7 +35,21 @@ jobs:
       - name: install-tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "cibuildwheel==3.4.0"
+          python -m pip install "cibuildwheel==3.4.0" "ninja==1.11.1.4"
+
+      - name: install-android-toolchains
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;${ANDROID_NDK_VERSION}" \
+            "cmake;${ANDROID_CMAKE_VERSION}"
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+          echo "ANDROID_NDK_ROOT=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+          echo "${ANDROID_SDK_ROOT}/cmake/${ANDROID_CMAKE_VERSION}/bin" >> "${GITHUB_PATH}"
+          echo "${ANDROID_SDK_ROOT}/platform-tools" >> "${GITHUB_PATH}"
 
       - name: resolve-numpy-ref
         id: resolve_ref
@@ -43,19 +59,23 @@ jobs:
           python - <<'PY'
           import json
           import os
+          import sys
           import urllib.request
 
           input_ref = (os.environ.get("INPUT_REF") or "").strip()
           if input_ref and input_ref.lower() != "latest":
               ref = input_ref
           else:
-              with urllib.request.urlopen("https://api.github.com/repos/numpy/numpy/releases/latest", timeout=30) as response:
-                  data = json.load(response)
-              ref = data["tag_name"]
+              try:
+                  with urllib.request.urlopen("https://api.github.com/repos/numpy/numpy/releases/latest", timeout=30) as response:
+                      data = json.load(response)
+                  ref = data["tag_name"]
+              except Exception:
+                  ref = "main"
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write(f"ref={ref}\n")
-          print(ref)
+          print(f"resolved numpy ref: {ref}", file=sys.stderr)
           PY
 
       - name: checkout-numpy
@@ -64,6 +84,27 @@ jobs:
           repository: numpy/numpy
           ref: ${{ steps.resolve_ref.outputs.ref }}
           path: external/numpy
+          submodules: recursive
+
+      - name: prepare-numpy-meson
+        run: |
+          if [ ! -f external/numpy/vendored-meson/meson/meson.py ]; then
+            git -C external/numpy submodule sync --recursive || true
+            git -C external/numpy submodule update --init --recursive || true
+          fi
+          if [ ! -f external/numpy/vendored-meson/meson/meson.py ]; then
+            mkdir -p external/numpy/vendored-meson
+            git clone --depth 1 https://github.com/mesonbuild/meson external/numpy/vendored-meson/meson
+          fi
+          test -f external/numpy/vendored-meson/meson/meson.py
+
+      - name: print-toolchain-versions
+        run: |
+          python --version
+          java -version
+          cmake --version
+          ninja --version
+          "${ANDROID_NDK_HOME}/ndk-build" --version
 
       - name: build-wheel
         working-directory: external/numpy
@@ -72,8 +113,23 @@ jobs:
           CIBW_ARCHS_ANDROID: arm64_v8a x86_64
           CIBW_BUILD: cp314-android_arm64_v8a cp314-android_x86_64
           CIBW_TEST_SKIP: "*"
-          CIBW_BUILD_VERBOSITY: "1"
-        run: python -m cibuildwheel --output-dir wheelhouse . --platform android
+          CIBW_BUILD_VERBOSITY: "3"
+          CIBW_BUILD_VERBOSITY_ANDROID: "3"
+          CIBW_CONFIG_SETTINGS: "setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false build-dir=build"
+          CIBW_CONFIG_SETTINGS_ANDROID: "setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false build-dir=build"
+        run: |
+          set -e
+          echo "CIBW_CONFIG_SETTINGS=${CIBW_CONFIG_SETTINGS}"
+          echo "CIBW_CONFIG_SETTINGS_ANDROID=${CIBW_CONFIG_SETTINGS_ANDROID}"
+          echo "CIBW_BUILD_VERBOSITY=${CIBW_BUILD_VERBOSITY}"
+          echo "CIBW_BUILD_VERBOSITY_ANDROID=${CIBW_BUILD_VERBOSITY_ANDROID}"
+          python -m cibuildwheel --output-dir wheelhouse . --platform android || {
+            find /tmp -type f \( -name "meson-log.txt" -o -name "*.log" \) | head -n 50 | while read -r file; do
+              echo "===== ${file} ====="
+              tail -n 200 "${file}" || true
+            done
+            exit 1
+          }
 
       - name: upload-artifact
         uses: actions/upload-artifact@v4
