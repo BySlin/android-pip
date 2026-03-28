@@ -237,7 +237,7 @@ jobs:
             pkg="$(find /tmp/opencv-loader-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
             [ -n "$pkg" ] || { echo "unpack failed: $whl" >&2; exit 2; }
             init_py="$pkg/cv2/__init__.py"
-            python3 -c 'import sys; from pathlib import Path; p=Path(sys.argv[1]); s=p.read_text(encoding="utf-8"); needle1="native_module = importlib.import_module(\"cv2\")"; repl1="native_module = importlib.import_module(\"cv2.cv2\")"; needle2="load_first_config([\"config.py\"], True)"; repl2="load_first_config([\"config.py\"], False)"; (_ for _ in ()).throw(SystemExit(f"loader import target not found: {p}")) if needle1 not in s else None; (_ for _ in ()).throw(SystemExit(f"config.py strict check not found: {p}")) if needle2 not in s else None; s=s.replace(needle1, repl1, 1).replace(needle2, repl2, 1); p.write_text(s, encoding="utf-8"); print(f"patched loader: {p}")' "$init_py"
+            python3 -c 'import sys; from pathlib import Path; p=Path(sys.argv[1]); s=p.read_text(encoding="utf-8"); needle1="native_module = importlib.import_module(\"cv2\")"; repl1="native_module = importlib.import_module(\"cv2.cv2\")"; needle2="load_first_config([\'config.py\'], True)"; repl2="load_first_config([\'config.py\'], False)"; (_ for _ in ()).throw(SystemExit(f"loader import target not found: {p}")) if needle1 not in s else None; (_ for _ in ()).throw(SystemExit(f"config.py strict check not found: {p}")) if needle2 not in s else None; s=s.replace(needle1, repl1, 1).replace(needle2, repl2, 1); p.write_text(s, encoding="utf-8"); print(f"patched loader: {p}")' "$init_py"
             python3 -m wheel pack "$pkg" -d /tmp/opencv-loader-repack
           done
           rm -f wheelhouse/*.whl
