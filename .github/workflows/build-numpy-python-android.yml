@@ -118,18 +118,25 @@ jobs:
           CIBW_CONFIG_SETTINGS: "setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false build-dir=build"
           CIBW_CONFIG_SETTINGS_ANDROID: "setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false build-dir=build"
         run: |
-          set -e
+          set +e
           echo "CIBW_CONFIG_SETTINGS=${CIBW_CONFIG_SETTINGS}"
           echo "CIBW_CONFIG_SETTINGS_ANDROID=${CIBW_CONFIG_SETTINGS_ANDROID}"
           echo "CIBW_BUILD_VERBOSITY=${CIBW_BUILD_VERBOSITY}"
           echo "CIBW_BUILD_VERBOSITY_ANDROID=${CIBW_BUILD_VERBOSITY_ANDROID}"
-          python -m cibuildwheel --output-dir wheelhouse . --platform android || {
-            find /tmp -type f \( -name "meson-log.txt" -o -name "*.log" \) | head -n 50 | while read -r file; do
-              echo "===== ${file} ====="
-              tail -n 200 "${file}" || true
+          python -m cibuildwheel --output-dir wheelhouse . --platform android
+          status=$?
+          if [ "${status}" -ne 0 ]; then
+            echo "cibuildwheel failed with exit code ${status}"
+            for run_dir in /tmp/cibw-run-*; do
+              if [ -d "${run_dir}" ]; then
+                find "${run_dir}" -type f \( -name "meson-log.txt" -o -name "*.log" \) 2>/dev/null | head -n 80 | while read -r file; do
+                  echo "===== ${file} ====="
+                  tail -n 200 "${file}" || true
+                done
+              fi
             done
-            exit 1
-          }
+            exit "${status}"
+          fi
 
       - name: upload-artifact
         uses: actions/upload-artifact@v4
