@@ -158,6 +158,7 @@ jobs:
           CIBW_BEFORE_BUILD: "python -m pip install -U pip setuptools wheel numpy"
           CIBW_BUILD_VERBOSITY: "3"
           CIBW_BUILD_VERBOSITY_ANDROID: "3"
+          CIBW_ENVIRONMENT_ANDROID: "LDFLAGS='-lm -lcompiler_rt $LDFLAGS -Wl,--no-as-needed -lpython3.14 -Wl,--as-needed'"
           CMAKE_ARGS: >-
             -DBUILD_ANDROID_PROJECTS=OFF 
             -DBUILD_ANDROID_EXAMPLES=OFF 
@@ -220,6 +221,68 @@ jobs:
 
           for wheel in wheels:
               print(f"valid wheel: {wheel} size={os.path.getsize(wheel)}")
+          PY
+
+      - name: patch-wheel-libpython-needed
+        working-directory: external/opencv-python
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade wheel
+          if ! command -v patchelf >/dev/null 2>&1; then
+            echo "patchelf not found" >&2
+            exit 1
+          fi
+          rm -rf /tmp/opencv-wheel-unpack /tmp/opencv-wheel-repack
+          mkdir -p /tmp/opencv-wheel-unpack /tmp/opencv-wheel-repack
+          shopt -s nullglob
+          for whl in wheelhouse/*.whl; do
+            rm -rf /tmp/opencv-wheel-unpack/*
+            python3 -m wheel unpack "$whl" -d /tmp/opencv-wheel-unpack
+            pkg="$(find /tmp/opencv-wheel-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+            [ -n "$pkg" ] || { echo "unpack failed: $whl" >&2; exit 2; }
+            while IFS= read -r -d '' so; do
+              if ! objdump -p "$so" | grep -E -q "NEEDED[[:space:]]+libpython3\\.14\\.so"; then
+                patchelf --add-needed libpython3.14.so "$so"
+              fi
+            done < <(find "$pkg/cv2" -type f -name "*.so" -print0 2>/dev/null || true)
+            python3 -m wheel pack "$pkg" -d /tmp/opencv-wheel-repack
+          done
+          rm -f wheelhouse/*.whl
+          cp -f /tmp/opencv-wheel-repack/*.whl wheelhouse/
+
+      - name: verify-wheel-libpython-needed
+        working-directory: external/opencv-python
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import os
+          import subprocess
+          import tempfile
+          import zipfile
+
+          wheels = sorted(glob.glob("wheelhouse/*.whl"))
+          if not wheels:
+              raise SystemExit("no wheels")
+
+          for wheel in wheels:
+              with tempfile.TemporaryDirectory() as td:
+                  with zipfile.ZipFile(wheel) as zf:
+                      zf.extractall(td)
+                  target = None
+                  for root, _, files in os.walk(td):
+                      for f in files:
+                          if f.startswith("cv2") and f.endswith(".so"):
+                              target = os.path.join(root, f)
+                              break
+                      if target:
+                          break
+                  if not target:
+                      raise SystemExit(f"cv2 native .so not found in {wheel}")
+                  out = subprocess.check_output(["objdump", "-p", target], text=True)
+                  if "libpython3.14.so" not in out:
+                      raise SystemExit(f"missing libpython3.14.so in {wheel}")
+                  print(f"verified libpython needed: {os.path.basename(wheel)}")
           PY
 
       - name: upload-artifact
