@@ -106,6 +106,36 @@ jobs:
           ninja --version
           "${ANDROID_NDK_HOME}/ndk-build" --version
 
+      - name: write-numpy-android-cross-helper
+        working-directory: external/numpy
+        run: |
+          cat > tools/wheels/cibw_prepare_android_cross.sh <<'SH'
+          set -e
+          arch_family="x86_64"
+          arch_cpu="x86_64"
+          if echo "${CC:-}" | grep -q "aarch64"; then
+            arch_family="aarch64"
+            arch_cpu="aarch64"
+          fi
+          ar_bin="${AR:-llvm-ar}"
+          strip_bin="${STRIP:-llvm-strip}"
+          cat > /tmp/meson-android-cross.ini <<EOF
+          [binaries]
+          c = '${CC}'
+          cpp = '${CXX}'
+          ar = '${ar_bin}'
+          strip = '${strip_bin}'
+          [host_machine]
+          system = 'android'
+          cpu_family = '${arch_family}'
+          cpu = '${arch_cpu}'
+          endian = 'little'
+          [properties]
+          needs_exe_wrapper = true
+          EOF
+          SH
+          chmod +x tools/wheels/cibw_prepare_android_cross.sh
+
       - name: build-wheel
         working-directory: external/numpy
         env:
@@ -115,8 +145,9 @@ jobs:
           CIBW_TEST_SKIP: "*"
           CIBW_BUILD_VERBOSITY: "3"
           CIBW_BUILD_VERBOSITY_ANDROID: "3"
-          CIBW_CONFIG_SETTINGS: "setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false build-dir=build"
-          CIBW_CONFIG_SETTINGS_ANDROID: "setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false build-dir=build"
+          CIBW_BEFORE_BUILD: "bash {project}/tools/wheels/cibw_before_build.sh {project} && bash {project}/tools/wheels/cibw_prepare_android_cross.sh"
+          CIBW_CONFIG_SETTINGS: "setup-args=--cross-file=/tmp/meson-android-cross.ini setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false"
+          CIBW_CONFIG_SETTINGS_ANDROID: "setup-args=--cross-file=/tmp/meson-android-cross.ini setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false"
         run: |
           set +e
           echo "CIBW_CONFIG_SETTINGS=${CIBW_CONFIG_SETTINGS}"
