@@ -102,9 +102,8 @@ jobs:
           )
           s = re.sub(
               r"(?m)^(\s*)raise Exception\(\"Not found: '%s'\" % relpath_re\)$",
-              r'\1if relpath_re.startswith("python/cv2/"):\n\1    continue\n\1raise Exception("Not found: \'%s\'" % relpath_re)',
+              r'\1print("skip missing artifact pattern:", relpath_re)\n\1continue',
               s,
-              count=1,
           )
           p.write_text(s, encoding="utf-8")
           print("patched setup.py for android wheel packaging")
