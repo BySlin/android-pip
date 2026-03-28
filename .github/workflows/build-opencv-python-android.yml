@@ -104,6 +104,11 @@ jobs:
           if old2 in s and "\"python/cv2/python-3.\" not in relpath_re" not in s:
               s = s.replace(old2, new2, 1)
               changed = True
+          old3 = "                          raise Exception(\"Not found: '%s'\" % relpath_re)"
+          new3 = "                          if \"python/cv2/python-3.\" in relpath_re:\n                              continue\n                          raise Exception(\"Not found: '%s'\" % relpath_re)"
+          if old3 in s and "if \"python/cv2/python-3.\" in relpath_re" not in s:
+              s = s.replace(old3, new3, 1)
+              changed = True
           if changed:
               p.write_text(s, encoding="utf-8")
           print("patched setup.py for cv2 config dir creation")
