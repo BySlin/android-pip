@@ -102,7 +102,7 @@ jobs:
           )
           s = re.sub(
               r"(?m)^(\s*)raise Exception\(\"Not found: '%s'\" % relpath_re\)$",
-              r"\1if \"python/cv2/python-3.\" in relpath_re:\n\1    continue\n\1raise Exception(\"Not found: '%s'\" % relpath_re)",
+              r'\1if "python/cv2/python-3." in relpath_re:\n\1    continue\n\1raise Exception("Not found: \'%s\'" % relpath_re)',
               s,
               count=1,
           )
