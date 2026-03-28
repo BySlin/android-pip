@@ -110,6 +110,10 @@ jobs:
               "\"-DPYTHON3_LIBRARY=%s\" % python_lib_path,\n                \"-DPython3_LIBRARY=%s\" % python_lib_path,\n                \"-DPython3_LIBRARIES=%s\" % python_lib_path,",
           )
           p.write_text(s, encoding="utf-8")
+          p2 = Path("opencv/modules/python/CMakeLists.txt")
+          s2 = p2.read_text(encoding="utf-8")
+          s2 = s2.replace("if(ANDROID OR APPLE_FRAMEWORK OR WINRT)", "if(APPLE_FRAMEWORK OR WINRT)")
+          p2.write_text(s2, encoding="utf-8")
           print("patched setup.py for android python3 detection")
           PY
 
