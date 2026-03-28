@@ -185,8 +185,8 @@ jobs:
           CIBW_BUILD_VERBOSITY: "3"
           CIBW_BUILD_VERBOSITY_ANDROID: "3"
           CIBW_BEFORE_BUILD: "export INSTALL_OPENBLAS=false && bash {project}/tools/wheels/cibw_before_build.sh {project} && bash {project}/tools/wheels/cibw_prepare_android_cross.sh"
-          CIBW_CONFIG_SETTINGS: "setup-args=--cross-file=/tmp/meson-android-cross.ini setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false setup-args=-Dblas=none setup-args=-Dlapack=none setup-args=-Db_lundef=false setup-args=-Dc_link_args=-Wl,--allow-shlib-undefined setup-args=-Dcpp_link_args=-Wl,--allow-shlib-undefined"
-          CIBW_CONFIG_SETTINGS_ANDROID: "setup-args=--cross-file=/tmp/meson-android-cross.ini setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false setup-args=-Dblas=none setup-args=-Dlapack=none setup-args=-Db_lundef=false setup-args=-Dc_link_args=-Wl,--allow-shlib-undefined setup-args=-Dcpp_link_args=-Wl,--allow-shlib-undefined"
+          CIBW_CONFIG_SETTINGS: "setup-args=--cross-file=/tmp/meson-android-cross.ini setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false setup-args=-Dblas=none setup-args=-Dlapack=none setup-args=-Dc_link_args=-Wl,--no-undefined,-lpython3.14 setup-args=-Dcpp_link_args=-Wl,--no-undefined,-lpython3.14"
+          CIBW_CONFIG_SETTINGS_ANDROID: "setup-args=--cross-file=/tmp/meson-android-cross.ini setup-args=-Dallow-noblas=true setup-args=-Duse-ilp64=false setup-args=-Dblas=none setup-args=-Dlapack=none setup-args=-Dc_link_args=-Wl,--no-undefined,-lpython3.14 setup-args=-Dcpp_link_args=-Wl,--no-undefined,-lpython3.14"
         run: |
           set +e
           echo "CIBW_CONFIG_SETTINGS=${CIBW_CONFIG_SETTINGS}"
