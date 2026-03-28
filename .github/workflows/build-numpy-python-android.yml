@@ -111,18 +111,35 @@ jobs:
         run: |
           cat > tools/wheels/cibw_prepare_android_cross.sh <<'SH'
           set -e
+          build_id="${CIBW_BUILD_IDENTIFIER:-}"
+          api_level="${ANDROID_API_LEVEL:-28}"
+          ndk_bin="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
           arch_family="x86_64"
           arch_cpu="x86_64"
-          if echo "${CC:-}" | grep -q "aarch64"; then
+          c_compiler="${ndk_bin}/x86_64-linux-android${api_level}-clang"
+          cpp_compiler="${ndk_bin}/x86_64-linux-android${api_level}-clang++"
+          if echo "${build_id}" | grep -q "android_arm64_v8a"; then
             arch_family="aarch64"
             arch_cpu="aarch64"
+            c_compiler="${ndk_bin}/aarch64-linux-android${api_level}-clang"
+            cpp_compiler="${ndk_bin}/aarch64-linux-android${api_level}-clang++"
           fi
-          ar_bin="${AR:-llvm-ar}"
-          strip_bin="${STRIP:-llvm-strip}"
+          if [ ! -x "${c_compiler}" ] || [ ! -x "${cpp_compiler}" ]; then
+            echo "invalid compiler path for ${build_id}"
+            echo "c=${c_compiler}"
+            echo "cpp=${cpp_compiler}"
+            exit 1
+          fi
+          ar_bin="${ndk_bin}/llvm-ar"
+          strip_bin="${ndk_bin}/llvm-strip"
+          echo "build_id=${build_id}"
+          echo "api_level=${api_level}"
+          echo "c_compiler=${c_compiler}"
+          echo "cpp_compiler=${cpp_compiler}"
           cat > /tmp/meson-android-cross.ini <<EOF
           [binaries]
-          c = '${CC}'
-          cpp = '${CXX}'
+          c = '${c_compiler}'
+          cpp = '${cpp_compiler}'
           ar = '${ar_bin}'
           strip = '${strip_bin}'
           [host_machine]
