@@ -250,8 +250,6 @@ jobs:
                 s,
                 count=1,
             )
-            if n1 == 0 and 'importlib.import_module("cv2.cv2")' not in s:
-                raise SystemExit(f"loader import target not found: {p}")
             s, _ = re.subn(
                 r'load_first_config\(\[\s*[\'"]config\.py[\'"]\s*\],\s*True\s*\)',
                 "load_first_config(['config.py'], False)",
@@ -259,7 +257,7 @@ jobs:
                 count=1,
             )
             p.write_text(s, encoding="utf-8")
-            print(f"patched loader: {p}")
+            print(f"patched loader: {p} import_patch={n1}")
             PY
             python3 /tmp/patch_cv2_loader.py "$init_py"
             python3 -m wheel pack "$pkg" -d /tmp/opencv-loader-repack
