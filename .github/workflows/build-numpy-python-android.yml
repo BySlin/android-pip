@@ -106,7 +106,7 @@ jobs:
           p = Path("numpy/_core/meson.build")
           s = p.read_text(encoding="utf-8")
           old = "longdouble_format = meson.get_external_property('longdouble_format', 'UNKNOWN')"
-          new = "longdouble_format = meson.get_external_property('longdouble_format', 'UNKNOWN')\\nif host_machine.system() == 'android' and longdouble_format == 'UNKNOWN'\\n  longdouble_format = 'IEEE_QUAD_LE'\\nendif"
+          new = "longdouble_format = meson.get_external_property('longdouble_format', 'UNKNOWN')\nif host_machine.system() == 'android' and longdouble_format == 'UNKNOWN'\n  longdouble_format = 'IEEE_QUAD_LE'\nendif"
           if old in s and "host_machine.system() == 'android'" not in s:
               s = s.replace(old, new, 1)
               p.write_text(s, encoding="utf-8")
