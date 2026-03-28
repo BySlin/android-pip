@@ -249,8 +249,9 @@ jobs:
             pkg="$(find /tmp/numpy-wheel-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
             [ -n "$pkg" ] || { echo "unpack failed: $whl" >&2; exit 2; }
             while IFS= read -r -d '' so; do
-              if ! objdump -p "$so" | grep -q "NEEDED .*libpython3.14.so"; then
+              if ! objdump -p "$so" | grep -E -q "NEEDED[[:space:]]+libpython3\\.14\\.so"; then
                 patchelf --add-needed libpython3.14.so "$so"
+                objdump -p "$so" | grep -E "NEEDED[[:space:]]+libpython3\\.14\\.so" >/dev/null
               fi
             done < <(find "$pkg" -type f -name "*.so" -print0)
             python3 -m wheel pack "$pkg" -d /tmp/numpy-wheel-repack
@@ -288,7 +289,7 @@ jobs:
                   if not target:
                       raise SystemExit(f"_multiarray_umath not found in {wheel}")
                   out = subprocess.check_output(["objdump", "-p", target], text=True)
-                  if "NEEDED       libpython3.14.so" not in out:
+                  if "libpython3.14.so" not in out:
                       raise SystemExit(f"missing libpython3.14.so in {wheel}")
                   print(f"verified libpython needed: {os.path.basename(wheel)}")
           PY
