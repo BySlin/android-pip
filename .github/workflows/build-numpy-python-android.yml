@@ -231,6 +231,70 @@ jobs:
             exit "${status}"
           fi
 
+      - name: patch-wheel-libpython-needed
+        working-directory: external/numpy
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade wheel
+          if ! command -v patchelf >/dev/null 2>&1; then
+            echo "patchelf not found" >&2
+            exit 1
+          fi
+          rm -rf /tmp/numpy-wheel-unpack /tmp/numpy-wheel-repack
+          mkdir -p /tmp/numpy-wheel-unpack /tmp/numpy-wheel-repack
+          shopt -s nullglob
+          for whl in wheelhouse/*.whl; do
+            python3 -m wheel unpack "$whl" -d /tmp/numpy-wheel-unpack
+          done
+          for pkg in /tmp/numpy-wheel-unpack/*; do
+            [ -d "$pkg" ] || continue
+            while IFS= read -r -d '' so; do
+              if objdump -T "$so" | grep -q " PyExc_ValueError"; then
+                if ! objdump -p "$so" | grep -q "NEEDED .*libpython3.14.so"; then
+                  patchelf --add-needed libpython3.14.so "$so"
+                fi
+              fi
+            done < <(find "$pkg" -type f -name "*.so" -print0)
+            python3 -m wheel pack "$pkg" -d /tmp/numpy-wheel-repack
+          done
+          rm -f wheelhouse/*.whl
+          cp -f /tmp/numpy-wheel-repack/*.whl wheelhouse/
+
+      - name: verify-wheel-libpython-needed
+        working-directory: external/numpy
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import os
+          import subprocess
+          import tempfile
+          import zipfile
+
+          wheels = sorted(glob.glob("wheelhouse/*.whl"))
+          if not wheels:
+              raise SystemExit("no wheels")
+
+          for wheel in wheels:
+              with tempfile.TemporaryDirectory() as td:
+                  with zipfile.ZipFile(wheel) as zf:
+                      zf.extractall(td)
+                  target = None
+                  for root, _, files in os.walk(td):
+                      for f in files:
+                          if f.endswith(".so") and "_multiarray_umath" in f:
+                              target = os.path.join(root, f)
+                              break
+                      if target:
+                          break
+                  if not target:
+                      raise SystemExit(f"_multiarray_umath not found in {wheel}")
+                  out = subprocess.check_output(["objdump", "-p", target], text=True)
+                  if "NEEDED       libpython3.14.so" not in out:
+                      raise SystemExit(f"missing libpython3.14.so in {wheel}")
+                  print(f"verified libpython needed: {os.path.basename(wheel)}")
+          PY
+
       - name: upload-artifact
         uses: actions/upload-artifact@v4
         with:
