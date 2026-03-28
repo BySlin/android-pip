@@ -100,13 +100,8 @@ jobs:
               s,
               count=1,
           )
-          s = re.sub(
-              r"(?m)^(\s*)raise Exception\(\"Not found: '%s'\" % relpath_re\)$",
-              r'\1print("skip missing artifact pattern:", relpath_re)\n\1continue',
-              s,
-          )
           p.write_text(s, encoding="utf-8")
-          print("patched setup.py for android wheel packaging")
+          print("patched setup.py for config directory creation")
           PY
 
       - name: print-toolchain-versions
@@ -136,7 +131,7 @@ jobs:
             -DBUILD_PERF_TESTS=OFF 
             -DENABLE_PYLINT=OFF 
             -DBUILD_opencv_python3=ON 
-            -DBUILD_SHARED_LIBS=OFF 
+            -DBUILD_SHARED_LIBS=ON
             -DCMAKE_BUILD_TYPE=Release
             -DINSTALL_CREATE_DISTRIB=ON
         run: |
@@ -155,6 +150,42 @@ jobs:
             done
             exit "${status}"
           fi
+
+      - name: validate-wheel-contents
+        working-directory: external/opencv-python
+        run: |
+          python3 - <<'PY'
+          import glob
+          import os
+          import sys
+          import zipfile
+
+          wheels = sorted(glob.glob("wheelhouse/*.whl"))
+          if not wheels:
+              print("no wheels generated", file=sys.stderr)
+              sys.exit(1)
+
+          bad = []
+          for wheel in wheels:
+              size = os.path.getsize(wheel)
+              with zipfile.ZipFile(wheel, "r") as zf:
+                  names = zf.namelist()
+              has_cv2_native = any(
+                  n.startswith("cv2/") and (n.endswith(".so") or ".so." in n)
+                  for n in names
+              )
+              if size < 5_000_000 or not has_cv2_native:
+                  bad.append((wheel, size, has_cv2_native))
+
+          if bad:
+              for wheel, size, has_cv2_native in bad:
+                  print(f"invalid wheel: {wheel} size={size} has_cv2_native={has_cv2_native}", file=sys.stderr)
+              print("opencv android wheel missing native cv2 module; likely CMake summary contains 'Unavailable: python3'", file=sys.stderr)
+              sys.exit(2)
+
+          for wheel in wheels:
+              print(f"valid wheel: {wheel} size={os.path.getsize(wheel)}")
+          PY
 
       - name: upload-artifact
         uses: actions/upload-artifact@v4
