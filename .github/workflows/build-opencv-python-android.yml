@@ -245,7 +245,7 @@ jobs:
             p = Path(sys.argv[1])
             s = p.read_text(encoding="utf-8")
             s, n1 = re.subn(
-                r'native_module\s*=\s*importlib\.import_module\("cv2"\)',
+                r"native_module\s*=\s*importlib\.import_module\(['\"]cv2['\"]\)",
                 'native_module = importlib.import_module("cv2.cv2")',
                 s,
                 count=1,
