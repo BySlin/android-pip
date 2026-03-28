@@ -181,6 +181,18 @@ jobs:
           status=$?
           if [ "${status}" -ne 0 ]; then
             echo "cibuildwheel failed with exit code ${status}"
+            find external/numpy -type f -path "*/meson-logs/meson-log.txt" 2>/dev/null | head -n 20 | while read -r meson_file; do
+              echo "===== first-error-context: ${meson_file} ====="
+              err_line="$(grep -n "ERROR:" "${meson_file}" | head -n 1 | cut -d: -f1)"
+              if [ -n "${err_line}" ]; then
+                start_line=$((err_line - 40))
+                if [ "${start_line}" -lt 1 ]; then start_line=1; fi
+                end_line=$((err_line + 60))
+                sed -n "${start_line},${end_line}p" "${meson_file}" || true
+              else
+                tail -n 200 "${meson_file}" || true
+              fi
+            done
             for run_dir in /tmp/cibw-run-*; do
               if [ -d "${run_dir}" ]; then
                 find "${run_dir}" -type f -name "meson-log.txt" 2>/dev/null | head -n 20 | while read -r meson_file; do
