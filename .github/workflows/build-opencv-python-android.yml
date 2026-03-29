@@ -237,23 +237,7 @@ jobs:
             pkg="$(find /tmp/opencv-loader-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
             [ -n "$pkg" ] || { echo "unpack failed: $whl" >&2; exit 2; }
             init_py="$pkg/cv2/__init__.py"
-            cat > /tmp/patch_cv2_loader.py <<'PY'
-            import sys
-            import re
-            from pathlib import Path
-
-            p = Path(sys.argv[1])
-            s = p.read_text(encoding="utf-8")
-            s, n1 = re.subn(
-                r"native_module\s*=\s*importlib\.import_module\(['\"]cv2['\"]\)",
-                'native_module = importlib.import_module("cv2.cv2")',
-                s,
-                count=1,
-            )
-            p.write_text(s, encoding="utf-8")
-            print(f"patched loader: {p} import_patch={n1}")
-            PY
-            python3 /tmp/patch_cv2_loader.py "$init_py"
+            python3 -c 'import sys,re; from pathlib import Path; p=Path(sys.argv[1]); s=p.read_text(encoding="utf-8"); s,n1=re.subn(r"native_module\\s*=\\s*importlib\\.import_module\\([\'\"]cv2[\'\"]\\)", "native_module = importlib.import_module(\"cv2.cv2\")", s, count=1); p.write_text(s, encoding="utf-8"); print(f"patched loader: {p} import_patch={n1}")' "$init_py"
             python3 -c 'import sys; from pathlib import Path; cv2_dir=Path(sys.argv[1]); config_py=cv2_dir / "config.py"; source=next((p.read_text(encoding="utf-8") for p in (cv2_dir / "config-3.14.py", cv2_dir / "config-3.py") if p.exists()), "PYTHON_EXTENSIONS_PATHS = []\\nBINARIES_PATHS = []\\n"); (config_py.write_text(source, encoding="utf-8"), print(f"created missing config.py: {config_py}")) if not config_py.exists() else None' "$pkg/cv2"
             python3 -m wheel pack "$pkg" -d /tmp/opencv-loader-repack
           done
