@@ -8,16 +8,16 @@ on:
         required: false
         default: "latest"
         type: string
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/build-android-python-packages.yml"
       opencv_python_ref:
         description: "opencv/opencv-python tag or branch"
         required: false
         default: "latest"
         type: string
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-android-python-packages.yml"
 
 permissions:
   contents: write
