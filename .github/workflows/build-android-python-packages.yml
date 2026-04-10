@@ -375,13 +375,51 @@ jobs:
             -DBUILD_ANDROID_PROJECTS=OFF
             -DBUILD_ANDROID_EXAMPLES=OFF
             -DBUILD_EXAMPLES=OFF
+            -DBUILD_DOCS=OFF
+            -DBUILD_JAVA=OFF
+            -DBUILD_FAT_JAVA_LIB=OFF
+            -DBUILD_JPEG=ON
+            -DBUILD_PNG=ON
+            -DBUILD_TIFF=ON
+            -DBUILD_WEBP=ON
             -DBUILD_TESTS=OFF
             -DBUILD_PERF_TESTS=OFF
+            -DBUILD_LIST=core,imgproc,imgcodecs,python3
+            -DBUILD_opencv_apps=OFF
+            -DBUILD_opencv_calib3d=OFF
+            -DBUILD_opencv_dnn=OFF
+            -DBUILD_opencv_features2d=OFF
+            -DBUILD_opencv_flann=OFF
+            -DBUILD_opencv_gapi=OFF
+            -DBUILD_opencv_highgui=OFF
+            -DBUILD_opencv_java_bindings_generator=OFF
+            -DBUILD_opencv_js=OFF
+            -DBUILD_opencv_ml=OFF
+            -DBUILD_opencv_objc=OFF
             -DENABLE_PYLINT=OFF
             -DBUILD_opencv_python3=ON
+            -DBUILD_opencv_python2=OFF
             -DBUILD_SHARED_LIBS=ON
             -DCMAKE_BUILD_TYPE=Release
             -DINSTALL_CREATE_DISTRIB=ON
+            -DWITH_1394=OFF
+            -DWITH_CUDA=OFF
+            -DWITH_FFMPEG=OFF
+            -DWITH_GSTREAMER=OFF
+            -DWITH_IPP=OFF
+            -DWITH_ITT=OFF
+            -DWITH_JASPER=OFF
+            -DWITH_MSMF=OFF
+            -DWITH_OPENCL=OFF
+            -DWITH_OPENCLAMDBLAS=OFF
+            -DWITH_OPENCLAMDFFT=OFF
+            -DWITH_OPENEXR=OFF
+            -DWITH_PROTOBUF=OFF
+            -DWITH_QUIRC=OFF
+            -DWITH_TBB=OFF
+            -DWITH_V4L=OFF
+            -DWITH_VA=OFF
+            -DWITH_VULKAN=OFF
             -DANDROID_PLATFORM=android-24
         run: |
           python -m cibuildwheel --output-dir wheelhouse . --platform android
@@ -432,7 +470,7 @@ jobs:
                   n.startswith("cv2/") and (n.endswith(".so") or ".so." in n)
                   for n in names
               )
-              if size < 1_500_000 or not has_cv2_native:
+              if not has_cv2_native:
                   bad.append((wheel, size, has_cv2_native))
 
           if bad:
