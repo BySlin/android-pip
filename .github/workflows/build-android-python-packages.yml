@@ -446,20 +446,66 @@ jobs:
         working-directory: external/opencv-python
         run: |
           set -euo pipefail
-          rm -rf /tmp/opencv-loader-unpack /tmp/opencv-loader-repack
-          mkdir -p /tmp/opencv-loader-unpack /tmp/opencv-loader-repack
-          shopt -s nullglob
-          for whl in wheelhouse/*.whl; do
-            rm -rf /tmp/opencv-loader-unpack/*
-            python3 -m wheel unpack "$whl" -d /tmp/opencv-loader-unpack
-            pkg="$(find /tmp/opencv-loader-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-            init_py="$pkg/cv2/__init__.py"
-            python3 -c "import re,sys;from pathlib import Path;p=Path(sys.argv[1]);s=p.read_text(encoding='utf-8');s,_=re.subn(r\"native_module\\s*=\\s*importlib\\.import_module\\([\\\"']cv2[\\\"']\\)\",\"native_module = importlib.import_module('cv2.cv2')\",s,count=1);p.write_text(s,encoding='utf-8')" "$init_py"
-            python3 -c "import sys;from pathlib import Path;cv2_dir=Path(sys.argv[1]);config_py=cv2_dir/'config.py';source=next((p.read_text(encoding='utf-8') for p in (cv2_dir/'config-3.14.py', cv2_dir/'config-3.py') if p.exists()),'PYTHON_EXTENSIONS_PATHS = []\\nBINARIES_PATHS = []\\n');(config_py.exists() or config_py.write_text(source,encoding='utf-8'))" "$pkg/cv2"
-            python3 -m wheel pack "$pkg" -d /tmp/opencv-loader-repack
-          done
-          rm -f wheelhouse/*.whl
-          cp -f /tmp/opencv-loader-repack/*.whl wheelhouse/
+          python3 - <<'PY'
+          import glob
+          import re
+          import shutil
+          import subprocess
+          from pathlib import Path
+
+          unpack_root = Path("/tmp/opencv-loader-unpack")
+          repack_root = Path("/tmp/opencv-loader-repack")
+          shutil.rmtree(unpack_root, ignore_errors=True)
+          shutil.rmtree(repack_root, ignore_errors=True)
+          unpack_root.mkdir(parents=True, exist_ok=True)
+          repack_root.mkdir(parents=True, exist_ok=True)
+
+          wheels = sorted(glob.glob("wheelhouse/*.whl"))
+          if not wheels:
+              raise SystemExit("no wheels in wheelhouse")
+
+          for whl in wheels:
+              for child in unpack_root.iterdir():
+                  if child.is_dir():
+                      shutil.rmtree(child, ignore_errors=True)
+                  else:
+                      child.unlink(missing_ok=True)
+              subprocess.run(["python3", "-m", "wheel", "unpack", whl, "-d", str(unpack_root)], check=True)
+              packages = [p for p in unpack_root.iterdir() if p.is_dir()]
+              if not packages:
+                  raise SystemExit(f"unpack failed: {whl}")
+              pkg = packages[0]
+
+              init_py = pkg / "cv2" / "__init__.py"
+              s = init_py.read_text(encoding="utf-8")
+              s, _ = re.subn(
+                  r'native_module\s*=\s*importlib\.import_module\(["\']cv2["\']\)',
+                  'native_module = importlib.import_module("cv2.cv2")',
+                  s,
+                  count=1,
+              )
+              init_py.write_text(s, encoding="utf-8")
+
+              cv2_dir = pkg / "cv2"
+              config_py = cv2_dir / "config.py"
+              if not config_py.exists():
+                  source = next(
+                      (
+                          p.read_text(encoding="utf-8")
+                          for p in (cv2_dir / "config-3.14.py", cv2_dir / "config-3.py")
+                          if p.exists()
+                      ),
+                      "PYTHON_EXTENSIONS_PATHS = []\nBINARIES_PATHS = []\n",
+                  )
+                  config_py.write_text(source, encoding="utf-8")
+
+              subprocess.run(["python3", "-m", "wheel", "pack", str(pkg), "-d", str(repack_root)], check=True)
+
+          for old in Path("wheelhouse").glob("*.whl"):
+              old.unlink()
+          for new_wheel in repack_root.glob("*.whl"):
+              shutil.copy2(new_wheel, Path("wheelhouse") / new_wheel.name)
+          PY
 
       - name: patch-opencv-wheel-libpython-needed
         working-directory: external/opencv-python
