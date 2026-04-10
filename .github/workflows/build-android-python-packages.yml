@@ -217,15 +217,17 @@ jobs:
           python3 - <<'PY'
           import glob
           import os
+          import re
           wheels = sorted(glob.glob("wheelhouse/*.whl"))
           if not wheels:
               raise SystemExit("no wheels generated")
-          need = {"android_arm64_v8a": False, "android_x86_64": False}
+          need = {"arm64_v8a": False, "x86_64": False}
           for wheel in wheels:
               name = os.path.basename(wheel)
-              for abi in tuple(need):
-                  if abi in name:
-                      need[abi] = True
+              if re.search(r"android(_[0-9]+)?_arm64_v8a\.whl$", name):
+                  need["arm64_v8a"] = True
+              if re.search(r"android(_[0-9]+)?_x86_64\.whl$", name):
+                  need["x86_64"] = True
           missing = [abi for abi, ok in need.items() if not ok]
           if missing:
               raise SystemExit(f"missing wheel abi: {', '.join(missing)}")
@@ -390,15 +392,17 @@ jobs:
           python3 - <<'PY'
           import glob
           import os
+          import re
           wheels = sorted(glob.glob("wheelhouse/*.whl"))
           if not wheels:
               raise SystemExit("no wheels generated")
-          need = {"android_arm64_v8a": False, "android_x86_64": False}
+          need = {"arm64_v8a": False, "x86_64": False}
           for wheel in wheels:
               name = os.path.basename(wheel)
-              for abi in tuple(need):
-                  if abi in name:
-                      need[abi] = True
+              if re.search(r"android(_[0-9]+)?_arm64_v8a\.whl$", name):
+                  need["arm64_v8a"] = True
+              if re.search(r"android(_[0-9]+)?_x86_64\.whl$", name):
+                  need["x86_64"] = True
           missing = [abi for abi, ok in need.items() if not ok]
           if missing:
               raise SystemExit(f"missing wheel abi: {', '.join(missing)}")
