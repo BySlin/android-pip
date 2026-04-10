@@ -545,6 +545,68 @@ jobs:
               shutil.copy2(new_wheel, Path("wheelhouse") / new_wheel.name)
           PY
 
+      - name: patch-opencv-wheel-bundle-opencv-world
+        working-directory: external/opencv-python
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import os
+          import re
+          import shutil
+          import subprocess
+          from pathlib import Path
+
+          unpack_root = Path('/tmp/opencv-world-unpack')
+          repack_root = Path('/tmp/opencv-world-repack')
+          shutil.rmtree(unpack_root, ignore_errors=True)
+          shutil.rmtree(repack_root, ignore_errors=True)
+          unpack_root.mkdir(parents=True, exist_ok=True)
+          repack_root.mkdir(parents=True, exist_ok=True)
+
+          wheels = sorted(glob.glob('wheelhouse/*.whl'))
+          if not wheels:
+              raise SystemExit('no wheels in wheelhouse')
+
+          def abi_from_wheel(path: str) -> str:
+              name = os.path.basename(path)
+              m = re.search(r'android(?:_[0-9]+)?_(arm64_v8a|x86_64)\.whl$', name)
+              if not m:
+                  raise SystemExit(f'cannot parse abi from wheel: {name}')
+              return m.group(1)
+
+          for whl in wheels:
+              for child in unpack_root.iterdir():
+                  if child.is_dir():
+                      shutil.rmtree(child, ignore_errors=True)
+                  else:
+                      child.unlink(missing_ok=True)
+
+              subprocess.run(['python3', '-m', 'wheel', 'unpack', whl, '-d', str(unpack_root)], check=True)
+              packages = [p for p in unpack_root.iterdir() if p.is_dir()]
+              if not packages:
+                  raise SystemExit(f'unpack failed: {whl}')
+              pkg = packages[0]
+
+              abi = abi_from_wheel(whl)
+              lib_src = Path(f'_skbuild/android-24-{abi}-3.14/cmake-install/sdk/native/libs/libopencv_world.so')
+              if not lib_src.exists():
+                  raise SystemExit(f'missing source libopencv_world.so: {lib_src}')
+
+              libs_dir = pkg / 'opencv_python.libs'
+              libs_dir.mkdir(parents=True, exist_ok=True)
+              lib_dst = libs_dir / 'libopencv_world.so'
+              shutil.copy2(lib_src, lib_dst)
+              print(f'bundled {lib_dst.name} into {os.path.basename(whl)}')
+
+              subprocess.run(['python3', '-m', 'wheel', 'pack', str(pkg), '-d', str(repack_root)], check=True)
+
+          for old in Path('wheelhouse').glob('*.whl'):
+              old.unlink()
+          for new_wheel in repack_root.glob('*.whl'):
+              shutil.copy2(new_wheel, Path('wheelhouse') / new_wheel.name)
+          PY
+
       - name: patch-opencv-wheel-libpython-needed
         working-directory: external/opencv-python
         run: |
@@ -583,6 +645,7 @@ jobs:
               with tempfile.TemporaryDirectory() as td:
                   with zipfile.ZipFile(wheel) as zf:
                       zf.extractall(td)
+                      names = set(zf.namelist())
                   target = None
                   for root, _, files in os.walk(td):
                       for f in files:
@@ -596,7 +659,9 @@ jobs:
                   out = subprocess.check_output(["objdump", "-p", target], text=True)
                   if "libpython3.14.so" not in out:
                       raise SystemExit(f"missing libpython3.14.so in {wheel}")
-                  print(f"verified libpython needed: {os.path.basename(wheel)}")
+                  if "opencv_python.libs/libopencv_world.so" not in names:
+                      raise SystemExit(f"missing bundled libopencv_world.so in {wheel}")
+                  print(f"verified wheel deps: {os.path.basename(wheel)}")
           PY
 
       - name: upload-opencv-artifact
