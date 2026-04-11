@@ -546,6 +546,15 @@ jobs:
               )
               if n_cfg == 0:
                   raise RuntimeError("failed to patch load_first_config(['config.py'], True)")
+
+              s, n_cfg_ver = re.subn(
+                  r"load_first_config\(\[\n\s*'config-\{\}\.\{\}\.py'\.format\(sys\.version_info\[0\], sys\.version_info\[1\]\),\n\s*'config-\{\}\.py'\.format\(sys\.version_info\[0\]\)\n\s*\], True\)",
+                  "load_first_config([\n        'config-{}.{}.py'.format(sys.version_info[0], sys.version_info[1]),\n        'config-{}.py'.format(sys.version_info[0])\n    ], False)",
+                  s,
+                  count=1,
+              )
+              if n_cfg_ver == 0 and "], False)" not in s:
+                  raise RuntimeError("failed to patch versioned config load_first_config to optional")
               init_py.write_text(s, encoding="utf-8")
 
               cv2_dir = pkg / "cv2"
