@@ -154,6 +154,14 @@ jobs:
               s = s.replace(misc_old, misc_new, 1)
 
           p.write_text(s, encoding="utf-8")
+
+          p2 = Path("numpy/_core/src/multiarray/temp_elide.c")
+          s2 = p2.read_text(encoding="utf-8")
+          old_cond = "#if defined HAVE_BACKTRACE && defined HAVE_DLFCN_H && ! defined PYPY_VERSION"
+          new_cond = "#if defined HAVE_BACKTRACE && defined HAVE_DLFCN_H && ! defined PYPY_VERSION && !defined(__ANDROID__)"
+          if old_cond in s2 and "!defined(__ANDROID__)" not in s2:
+              s2 = s2.replace(old_cond, new_cond, 1)
+              p2.write_text(s2, encoding="utf-8")
           print("patched longdouble detection for android cross build")
           PY
 
