@@ -147,7 +147,13 @@ jobs:
           new = "longdouble_format = meson.get_external_property('longdouble_format', 'UNKNOWN')\nif host_machine.system() == 'android' and longdouble_format == 'UNKNOWN'\n  longdouble_format = 'IEEE_QUAD_LE'\nendif"
           if old in s and "host_machine.system() == 'android'" not in s:
               s = s.replace(old, new, 1)
-              p.write_text(s, encoding="utf-8")
+
+          misc_old = "optional_misc_funcs = [\n  'backtrace',\n  'madvise',\n]"
+          misc_new = "optional_misc_funcs = [\n  'madvise',\n]\nif host_machine.system() != 'android'\n  optional_misc_funcs += ['backtrace']\nendif  # android-disable-backtrace"
+          if misc_old in s and "android-disable-backtrace" not in s:
+              s = s.replace(misc_old, misc_new, 1)
+
+          p.write_text(s, encoding="utf-8")
           print("patched longdouble detection for android cross build")
           PY
 
