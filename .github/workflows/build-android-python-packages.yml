@@ -516,12 +516,8 @@ jobs:
 
               init_py = pkg / "cv2" / "__init__.py"
               s = init_py.read_text(encoding="utf-8")
-              s, _ = re.subn(
-                  r'native_module\s*=\s*importlib\.import_module\(["\']cv2["\']\)',
-                  'native_module = importlib.import_module("cv2.cv2")',
-                  s,
-                  count=1,
-              )
+              # Keep upstream native-module import behavior. For Chaquopy, forcing
+              # "cv2.cv2" can fail with "'cv2' is not a package".
               def _patch_load_first_config(match):
                   indent = match.group("indent")
                   return (
