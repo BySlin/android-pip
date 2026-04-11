@@ -522,19 +522,25 @@ jobs:
                   s,
                   count=1,
               )
+              def _patch_load_first_config(match):
+                  indent = match.group("indent")
+                  return (
+                      f"{indent}if not os.path.exists(os.path.join(LOADER_DIR, 'config.py')):\n"
+                      f"{indent}    _fallback_cfg = (\n"
+                      f"{indent}        'PYTHON_EXTENSIONS_PATHS = [LOADER_DIR]\\n'\n"
+                      f"{indent}        \"BINARIES_PATHS = [os.path.join(LOADER_DIR, '..', 'opencv_python.libs')]\\n\"\n"
+                      f"{indent}    )\n"
+                      f"{indent}    try:\n"
+                      f"{indent}        with open(os.path.join(LOADER_DIR, 'config.py'), 'w', encoding='utf-8') as f:\n"
+                      f"{indent}            f.write(_fallback_cfg)\n"
+                      f"{indent}    except Exception:\n"
+                      f"{indent}        pass\n"
+                      f"{indent}load_first_config(['config.py'], True)"
+                  )
+
               s, n_cfg = re.subn(
                   r"(?m)^(?P<indent>\s*)load_first_config\(\['config\.py'\], True\)$",
-                  r"\g<indent>if not os.path.exists(os.path.join(LOADER_DIR, 'config.py')):\n"
-                  r"\g<indent>    _fallback_cfg = (\n"
-                  r"\g<indent>        \"PYTHON_EXTENSIONS_PATHS = [LOADER_DIR]\\n\"\n"
-                  r"\g<indent>        \"BINARIES_PATHS = [os.path.join(LOADER_DIR, '..', 'opencv_python.libs')]\\n\"\n"
-                  r"\g<indent>    )\n"
-                  r"\g<indent>    try:\n"
-                  r"\g<indent>        with open(os.path.join(LOADER_DIR, 'config.py'), 'w', encoding='utf-8') as f:\n"
-                  r"\g<indent>            f.write(_fallback_cfg)\n"
-                  r"\g<indent>    except Exception:\n"
-                  r"\g<indent>        pass\n"
-                  r"\g<indent>load_first_config(['config.py'], True)",
+                  _patch_load_first_config,
                   s,
                   count=1,
               )
