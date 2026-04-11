@@ -522,6 +522,21 @@ jobs:
                   s,
                   count=1,
               )
+              s = s.replace(
+                  "load_first_config(['config.py'], True)",
+                  "if not os.path.exists(os.path.join(LOADER_DIR, 'config.py')):\n"
+                  "    _fallback_cfg = (\n"
+                  "        \"PYTHON_EXTENSIONS_PATHS = [LOADER_DIR]\\n\"\n"
+                  "        \"BINARIES_PATHS = [os.path.join(LOADER_DIR, '..', 'opencv_python.libs')]\\n\"\n"
+                  "    )\n"
+                  "    try:\n"
+                  "        with open(os.path.join(LOADER_DIR, 'config.py'), 'w', encoding='utf-8') as f:\n"
+                  "            f.write(_fallback_cfg)\n"
+                  "    except Exception:\n"
+                  "        pass\n"
+                  "load_first_config(['config.py'], True)",
+                  1,
+              )
               init_py.write_text(s, encoding="utf-8")
 
               cv2_dir = pkg / "cv2"
